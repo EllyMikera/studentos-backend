@@ -1,78 +1,104 @@
 const pool = require('../config/DBconnection')
 
 const addUnits = async (req, res) => {
-    //const {student_id, unit_code, unit_name, semester_id /*facilitator_name, facilitator_phone_number*/} = req.body;
     const student_id = req.user.student_id
-    console.log(student_id)
-    const {unit_code, unit_name, semester_id} = req.body;
-    const upperUnitCode = unit_code.toUpperCase()
-    const upperUnitName = unit_name.toUpperCase()
-    // const upperFacilitatorName = facilitator_name.toUpperCase()
+    const {
+        unit_code,
+        unit_name,
+        semester_id
+    } = req.body
+
     try {
-        if(!unit_code || !unit_name /* || !semester_id || !facilitator_name || !facilitator_phone_number*/) {
-            console.log('Input fields cannot be empty. Enter the highlighted fields to continue')
+        if (!unit_code || !unit_name || !semester_id) {
             return res.status(400).json({
-                message: 'Input fields cannot be empty. Enter the highlighted fields to continue'
+                message: 'Input fields cannot be empty.'
             })
         }
-        // const [existingFacilitator] = await pool.query(
-        //     `SELECT BIN_TO_UUID(facilitator_id) AS facilitator_id, facilitator_name, facilitator_phone_number FROM Facilitators 
-        //     WHERE facilitator_phone_number = ?`, [facilitator_phone_number]
-        // )
 
-        // let facilitatorID;
-        // if (existingFacilitator.length === 0) {
-        //     await pool.query(
-        //         `INSERT INTO Facilitators(facilitator_id, facilitator_name, facilitator_phone_number)
-        //         VALUES(UUID_TO_BIN(UUID()), ?, ?)`, [upperFacilitatorName, facilitator_phone_number]
-        //     )
-        //     const [insertedFacilitator] = await pool.query(
-        //         `SELECT BIN_TO_UUID(facilitator_id) AS facilitator_id FROM Facilitators
-        //         WHERE facilitator_phone_number = ?`, [facilitator_phone_number]
-        //     )
-        //     facilitatorID = insertedFacilitator[0].facilitator_id
-        // } else {
-        //     facilitatorID = existingFacilitator[0].facilitator_id
-        // }
+        const upperUnitCode = unit_code.toUpperCase()
+        const upperUnitName = unit_name.toUpperCase()
 
+        // 1. Check whether the unit already exists
         const [units] = await pool.query(
-            `SELECT unit_code, unit_name FROM Units
-            WHERE unit_code = ?`, [unit_code]
+            `SELECT BIN_TO_UUID(unit_id) AS unit_id
+             FROM Units
+             WHERE unit_code = ?`,
+            [upperUnitCode]
         )
 
-        if(units.length > 0) {
-            console.log('This units already exists. Insert a new unit to proceed')
-            return res.status(400).json({
-                message: 'This units already exists. Insert a new unit to proceed'
-            })
-        } else {
+        let unitID
+
+        // 2. If unit doesn't exist, create it
+        if (units.length === 0) {
             await pool.query(
-                `INSERT INTO Units(unit_id, unit_code, unit_name)
-                VALUES(UUID_TO_BIN(UUID()), ?, ?)`, [upperUnitCode, upperUnitName]
+                `INSERT INTO Units(
+                    unit_id,
+                    unit_code,
+                    unit_name
+                )
+                VALUES(
+                    UUID_TO_BIN(UUID()),
+                    ?,
+                    ?
+                )`,
+                [upperUnitCode, upperUnitName]
             )
+
+            // Get the newly created unit ID
+            const [newUnit] = await pool.query(
+                `SELECT BIN_TO_UUID(unit_id) AS unit_id
+                 FROM Units
+                 WHERE unit_code = ?`,
+                [upperUnitCode]
+            )
+
+            unitID = newUnit[0].unit_id
+
+        } else {
+            // 3. Unit already exists, reuse its ID
+            unitID = units[0].unit_id
         }
 
-        const [insertedUnit] = await pool.query(
-            `SELECT BIN_TO_UUID(unit_id) AS unit_id FROM Units
-            WHERE unit_code = ?`, [unit_code]
+
+        // 4. Check whether THIS STUDENT already has THIS UNIT
+        const [existingEnrollment] = await pool.query(
+            `SELECT enrollment_id
+             FROM Enrollments
+             WHERE student_id = UUID_TO_BIN(?)
+             AND unit_id = UUID_TO_BIN(?)
+             AND semester_id = UUID_TO_BIN(?)`,
+            [student_id, unitID, semester_id]
         )
 
-        const unitID = insertedUnit[0].unit_id
-        console.log(unitID)
 
+        // 5. Student already has this unit
+        if (existingEnrollment.length > 0) {
+            return res.status(400).json({
+                message: 'You have already added this unit.'
+            })
+        }
+
+
+        // 6. Student doesn't have the unit → create enrollment
         await pool.query(
-            `INSERT INTO Enrollments(enrollment_id, student_id, unit_id, semester_id)
-            VALUES(UUID_TO_BIN(UUID()), UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?))`, [student_id, unitID, semester_id]
+            `INSERT INTO Enrollments(
+                enrollment_id,
+                student_id,
+                unit_id,
+                semester_id
+            )
+            VALUES(
+                UUID_TO_BIN(UUID()),
+                UUID_TO_BIN(?),
+                UUID_TO_BIN(?),
+                UUID_TO_BIN(?)
+            )`,
+            [student_id, unitID, semester_id]
         )
 
-        // await pool.query(
-        //     `INSERT INTO Enrollments(unit_id)
-        //     VALUES(UUID_TO_BIN(?))`, [unitID]
-        // )
-        
-        console.log('Units updated successfully')
-        res.status(201).json({
-            message: 'Units updated successfully'
+        console.log('Unit added successfully.')
+        return res.status(201).json({
+            message: 'Unit added successfully.'
         })
 
     } catch (error) {
