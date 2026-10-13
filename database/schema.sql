@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS Semesters(
 CREATE TABLE IF NOT EXISTS Assignments(
     assignment_id BINARY(16) PRIMARY KEY,
     unit_id BINARY(16),
-    description VARCHAR(255),
     date_issued DATE,
     due_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -69,11 +68,18 @@ CREATE TABLE IF NOT EXISTS Enrollments(
     enrollment_id BINARY(16) PRIMARY KEY,
     student_id BINARY(16),
     semester_id BINARY(16),
-    unit_id BINARY(16),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(student_id) REFERENCES Students(student_id),
-    FOREIGN KEY(semester_id) REFERENCES Semesters(semester_id),
-    FOREIGN KEY(unit_id) REFERENCES Units(unit_id)
+    FOREIGN KEY(semester_id) REFERENCES Semesters(semester_id)
+);
+
+CREATE TABLE IF NOT EXISTS EnrolledUnits(
+    enrolledunit_id BINARY(16) PRIMARY KEY,
+    unit_id BINARY(16),
+    enrollment_id BINARY(16),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(unit_id) REFERENCES Units(unit_id),
+    FOREIGN KEY(enrollment_id) REFERENCES Enrollments(enrollment_id)
 );
 
 CREATE TABLE IF NOT EXISTS Student_assignments (
