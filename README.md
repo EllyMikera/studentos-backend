@@ -13,10 +13,7 @@ Built with **Node.js, Express.js, and MySQL**.
 5. [Authentication](#authentication)
 6. [Project Setup](#project-setup)
 7. [Error Handling](#error-handling)
-8. [Security Considerations](#security-considerations)
-9. [Development Status](#development-status)
-10. [Future Improvements](#future-improvements)
-11. [License](#license)
+
 
 ## Technologies Used
 
