@@ -2,9 +2,9 @@ const pool = require('../config/DBconnection')
 
 const addGoal = async (req, res) => {
     const student_id = req.user.student_id
-    const {semester_id, description} = req.body
+    const {description} = req.body
     try {
-        if (!semester_id || !description) {
+        if (!description) {
             console.log('Input fields cannot be empty. Fill in the highlighted fields to continue')
             return res.status(400).json({
                 message: 'Input fields cannot be empty. Fill in the highlighted fields to continue'
@@ -22,6 +22,13 @@ const addGoal = async (req, res) => {
         )
 
         const getGoalID = goalID[0].goal_id
+
+        const [semester] = await pool.query(
+            `SELECT BIN_TO_UUID(semester_id) AS semester_id FROM Enrollments
+            WHERE student_id = UUID_TO_BIN(?)`, [student_id]
+        )
+
+        const semester_id = semester[0].semester_id
 
         await pool.query(
             `INSERT INTO Student_goals(student_goals_id, student_id, goal_id, semester_id)

@@ -20,15 +20,7 @@ const registerUser = async (req, res) => {
         school, 
         department,
         institution,
-    } = req.body
-    const upperReg = reg_number.toUpperCase()
-    const upperCourse = course.toUpperCase()
-    const upperYear = year_of_study.toUpperCase()
-    const upperSemester = semester_name.toUpperCase()
-    const upperAcademic = academic_year.toUpperCase() 
-    const upperSchool = school.toUpperCase()
-    const upperDepartment = department.toUpperCase()
-    const upperInstitution = institution.toUpperCase()
+    } = req.body;
     
     try {
         if(
@@ -70,14 +62,40 @@ const registerUser = async (req, res) => {
             `INSERT INTO Students(student_id, name, reg_number, phone_number, email, password, course, year_of_study, school, department, institution)
             VALUES(
                 UUID_TO_BIN(UUID()),?,?,?,?,?,?,?,?,?,?    
-            )`,[name, upperReg, phone_number, email, hashedPassword, upperCourse, upperYear, upperSchool, upperDepartment, upperInstitution]
+            )`,[name, reg_number, phone_number, email, hashedPassword, course, year_of_study, school, department, institution]
         )
 
-        await pool.query(
-            `INSERT INTO Semesters(semester_id, semester_name, academic_year, start_date, end_date)
-            VALUES(UUID_TO_BIN(UUID()), ?, ?, ?, ?)`, [upperSemester, upperAcademic, start_date, end_date]
+        const [existingSemester] = await pool.query(
+            `SELECT BIN_TO_UUID(semester_id) AS semester_id
+            FROM Semesters
+            WHERE semester_name = ?
+            AND academic_year = ?
+            AND start_date = ?
+            AND end_date = ?`,
+            [semester_name, academic_year, start_date, end_date]
         )
 
+        let semesterID;
+        if(existingSemester.length === 0) {
+            await pool.query(
+                `INSERT INTO Semesters(semester_id, semester_name, academic_year, start_date, end_date)
+                VALUES(UUID_TO_BIN(UUID()), ?, ?, ?, ?)`, [semester_name, academic_year, start_date, end_date]
+            )
+
+            const [newSemester] = await pool.query(
+                `SELECT BIN_TO_UUID(semester_id) AS semester_id
+                FROM Semesters
+                WHERE semester_name = ?
+                AND academic_year = ?
+                AND start_date = ?
+                AND end_date = ?`,
+                [semester_name, academic_year, start_date, end_date]
+            )
+
+            semesterID = newSemester[0].semester_id
+        } else {
+            semesterID = existingSemester[0].semester_id
+        }
 
         const [registeredStudent] = await pool.query(
             `SELECT BIN_TO_UUID(student_id) AS student_id FROM Students
@@ -86,17 +104,10 @@ const registerUser = async (req, res) => {
 
         const studentID = registeredStudent[0].student_id
 
-        const [newSemester] = await pool.query(
-            `SELECT BIN_TO_UUID(semester_id) AS semester_id FROM Semesters
-            WHERE academic_year = ?`, [academic_year]
+        await pool.query(
+           `INSERT INTO Enrollments(enrollment_id, student_id, semester_id)
+            VALUES(UUID_TO_BIN(UUID()), UUID_TO_BIN(?), UUID_TO_BIN(?))`, [studentID, semesterID]
         )
-
-        const semesterID = newSemester[0].semester_id
-
-        // await pool.query(
-        //     `INSERT INTO Enrollments(enrollment_id, student_id, semester_id)
-        //     VALUES(UUID_TO_BIN(UUID()), UUID_TO_BIN(?), UUID_TO_BIN(?))`, [studentID, semesterID]
-        // )
 
         console.log('Account created successfully')
         res.status(201).json({

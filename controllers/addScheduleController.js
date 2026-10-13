@@ -1,41 +1,80 @@
 const pool = require('../config/DBconnection')
 
 const addSchedule = async (req, res) => {
-    const {unit_id, day, venue, start_time, end_time} = req.body
+    const student_id = req.user.student_id
+    const { unit_id, day, venue, start_time, end_time } = req.body
+
     try {
+        // 1. Validate the input fields
         if (!unit_id || !day || !venue || !start_time || !end_time) {
-            console.log('Input fields cannot be empty. Please insert the highlighted fields to continue')
             return res.status(400).json({
-                message: 'Input fields cannot be empty. Please insert the highlighted fields to continue'
+                message: 'Input fields cannot be empty. Please insert the highlighted fields to continue.'
             })
         }
 
+        // 2. Check whether the student has enrolled in the unit
+        const [enrolledUnits] = await pool.query(
+            `SELECT eu.unit_id
+             FROM Enrollments AS e
+             JOIN EnrolledUnits AS eu
+                 ON e.enrollment_id = eu.enrollment_id
+             WHERE e.student_id = UUID_TO_BIN(?)
+             AND eu.unit_id = UUID_TO_BIN(?)`,
+            [student_id, unit_id]
+        )
+
+        if (enrolledUnits.length === 0) {
+            return res.status(404).json({
+                message: 'You have not enrolled in this unit. Ensure you add the unit before adding a schedule.'
+            })
+        }
+
+        // 3. Check whether this exact schedule already exists for the unit
         const [existingSchedule] = await pool.query(
-            `SELECT BIN_TO_UUID(unit_id) AS unit_id, day, venue, start_time, end_time FROM Schedules
-            WHERE unit_id = ?`, [unit_id]
+            `SELECT schedule_id
+             FROM Schedules
+             WHERE unit_id = UUID_TO_BIN(?)
+             AND day = ?
+             AND venue = ?
+             AND start_time = ?
+             AND end_time = ?`,
+            [unit_id, day, venue, start_time, end_time]
         )
 
-        if(existingSchedule.length > 0) {
-            console.log('This unit already has the inserted schedule. Insert another time schedule')
-            return res.status(400).json({
-                message: 'This unit already has the inserted schedule. Insert another time schedule'
-            })
+        if (existingSchedule.length === 0) {
+            // return res.status(200).json({
+            //     message: 'This schedule already exists for this unit. The existing schedule has been reused.'
+            // })
+
+            // 4. Insert the schedule only if the exact record does not exist
+            await pool.query(
+                `INSERT INTO Schedules (
+                    schedule_id,
+                    unit_id,
+                    day,
+                    venue,
+                    start_time,
+                    end_time
+                )
+                VALUES (
+                    UUID_TO_BIN(UUID()),
+                    UUID_TO_BIN(?),
+                    ?, ?, ?, ?
+                )`,
+                [unit_id, day, venue, start_time, end_time]
+            )
         }
 
-        await pool.query(
-            `INSERT INTO Schedules(schedule_id, unit_id, day, venue, start_time, end_time)
-            VALUES(UUID_TO_BIN(UUID()), UUID_TO_BIN(?), ?, ?, ?, ?)`, [unit_id, day, venue, start_time, end_time]
-        )
-
-        console.log('Schedule updated successfully')
+        // 5. Return a success response
         return res.status(201).json({
-            message: 'Schedule updated successfully'
+            message: 'Schedule added successfully.'
         })
 
     } catch (error) {
-        console.log(error?.message)
+        console.error(error?.message)
+
         return res.status(500).json({
-            message: 'Internal server error'
+            message: 'Internal server error.'
         })
     }
 }
