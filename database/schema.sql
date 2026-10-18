@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS Students(
     student_id BINARY(16) PRIMARY KEY,
     name VARCHAR(30) NOT NULL,
     reg_number VARCHAR(20) NOT NULL,
-    phone_number VARCHAR(11) NOT NULL UNIQUE,
+    phone_number VARCHAR(13) NOT NULL UNIQUE,
     email VARCHAR(30) NOT NULL,
     password VARCHAR(255) NOT NULL,
     course VARCHAR(150) NOT NULL,
