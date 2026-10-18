@@ -1,5 +1,6 @@
 const express = require('express')
 const dotenv = require('dotenv')
+const cors = require('cors')
 const server = express()
 const loginUser = require('./routes/login')
 const registerUser = require('./routes/register')
@@ -14,6 +15,9 @@ dotenv.config()
 const PORT = process.env.DEV_PORT
 
 server.use(express.json())
+server.use(cors({
+    origin: process.env.CLIENT_URL
+}))
 
 server.use('/login', loginUser)
 server.use('/register', registerUser)
